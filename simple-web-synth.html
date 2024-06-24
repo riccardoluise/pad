@@ -76,9 +76,11 @@
         const debugInfo = document.getElementById('debug_info');
 
         const mappings = {
+            oscillator_noise_amplitude: { min: 0.25, max: 0 },
+            filter_lfo_amount: { min: 0, max: 0.4 },
+            lfo_frequency: { min: 20, max: 1 },
             oscillator_pulse_width: { min: -1, max: 1 },
             filter_frequency: { min: 20, max: 20000 },
-            lfo_frequency: { min: 0.1, max: 1000 },
             oscillator_pitch_offset: { min: -48, max: 48 },
             amplitude: { min: 0, max: 1 }
         };
@@ -112,21 +114,29 @@
         }
 
         function updateParameters(x, y) {
+            const noiseAmplitude = x * (mappings.oscillator_noise_amplitude.max - mappings.oscillator_noise_amplitude.min) + mappings.oscillator_noise_amplitude.min;
+            const filterLfoAmount = y * (mappings.filter_lfo_amount.max - mappings.filter_lfo_amount.min) + mappings.filter_lfo_amount.min;
+            const lfoFreq = y * (mappings.lfo_frequency.max - mappings.lfo_frequency.min) + mappings.lfo_frequency.min;
             const pulseWidth = x * (mappings.oscillator_pulse_width.max - mappings.oscillator_pulse_width.min) + mappings.oscillator_pulse_width.min;
             const filterFreq = y * (mappings.filter_frequency.max - mappings.filter_frequency.min) + mappings.filter_frequency.min;
-            const lfoFreq = y * (mappings.lfo_frequency.max - mappings.lfo_frequency.min) + mappings.lfo_frequency.min;
             const pitchOffset = x * (mappings.oscillator_pitch_offset.max - mappings.oscillator_pitch_offset.min) + mappings.oscillator_pitch_offset.min;
             const amp = y * (mappings.amplitude.max - mappings.amplitude.min) + mappings.amplitude.min;
 
             if (isPlaying) {
+                // Oscillator noise amplitude
+                gainNode.gain.setValueAtTime(noiseAmplitude, audioContext.currentTime);
+                
+                // Filter LFO amount
+                filterNode.frequency.setValueAtTime(filterLfoAmount, audioContext.currentTime);
+                
+                // LFO frequency
+                lfoNode.frequency.setValueAtTime(lfoFreq, audioContext.currentTime);
+                
                 // Oscillator pulse width (approximated with detune for sawtooth wave)
                 oscillator.detune.setValueAtTime(pulseWidth * 100, audioContext.currentTime);
                 
                 // Filter frequency
                 filterNode.frequency.setValueAtTime(filterFreq, audioContext.currentTime);
-                
-                // LFO frequency
-                lfoNode.frequency.setValueAtTime(lfoFreq, audioContext.currentTime);
                 
                 // Oscillator pitch offset
                 oscillator.detune.setValueAtTime(pitchOffset * 100, audioContext.currentTime);
@@ -142,7 +152,7 @@
             document.getElementById('oscillator_pitch_offset').textContent = `Pitch Offset: ${pitchOffset.toFixed(2)} st`;
             document.getElementById('amplitude').textContent = `Amplitude: ${amp.toFixed(2)}`;
 
-            updateDebugInfo(x, y, pulseWidth, filterFreq, lfoFreq, pitchOffset, amp);
+            updateDebugInfo(x, y, noiseAmplitude, filterLfoAmount, lfoFreq, pulseWidth, filterFreq, pitchOffset, amp);
         }
 
         function updateXYPad(e) {
@@ -164,13 +174,15 @@
             xyPad.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
         }
 
-        function updateDebugInfo(x, y, pulseWidth, filterFreq, lfoFreq, pitchOffset, amp) {
+        function updateDebugInfo(x, y, noiseAmplitude, filterLfoAmount, lfoFreq, pulseWidth, filterFreq, pitchOffset, amp) {
             debugInfo.textContent = JSON.stringify({
                 x: x.toFixed(2),
                 y: y.toFixed(2),
+                noiseAmplitude: noiseAmplitude.toFixed(2),
+                filterLfoAmount: filterLfoAmount.toFixed(2),
+                lfoFreq: lfoFreq.toFixed(2),
                 pulseWidth: pulseWidth.toFixed(2),
                 filterFreq: filterFreq.toFixed(2),
-                lfoFreq: lfoFreq.toFixed(2),
                 pitchOffset: pitchOffset.toFixed(2),
                 amplitude: amp.toFixed(2),
                 isPlaying

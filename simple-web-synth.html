@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Synthesizer with Accurate XY Mapping</title>
+    <title>Web Synthesizer with Dynamic Parameter Ranges</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
             background-color: #f0f0f0;
         }
@@ -45,6 +45,19 @@
             background-color: #f0f0f0;
             border-radius: 5px;
         }
+        .range-inputs {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .range-input {
+            display: flex;
+            flex-direction: column;
+        }
+        .range-input input {
+            width: 80px;
+        }
     </style>
 </head>
 <body>
@@ -60,6 +73,50 @@
             <div id="filter_frequency"></div>
             <div id="oscillator_pitch_offset"></div>
             <div id="amplitude"></div>
+        </div>
+        <div class="range-inputs">
+            <div class="range-input">
+                <label for="noise_amp_min">Noise Amp Min:</label>
+                <input type="number" id="noise_amp_min" value="0" step="0.01">
+                <label for="noise_amp_max">Noise Amp Max:</label>
+                <input type="number" id="noise_amp_max" value="0.25" step="0.01">
+            </div>
+            <div class="range-input">
+                <label for="pulse_width_min">Pulse Width Min:</label>
+                <input type="number" id="pulse_width_min" value="-1" step="0.1">
+                <label for="pulse_width_max">Pulse Width Max:</label>
+                <input type="number" id="pulse_width_max" value="1" step="0.1">
+            </div>
+            <div class="range-input">
+                <label for="pitch_offset_min">Pitch Offset Min:</label>
+                <input type="number" id="pitch_offset_min" value="-48" step="1">
+                <label for="pitch_offset_max">Pitch Offset Max:</label>
+                <input type="number" id="pitch_offset_max" value="48" step="1">
+            </div>
+            <div class="range-input">
+                <label for="filter_lfo_min">Filter LFO Min:</label>
+                <input type="number" id="filter_lfo_min" value="0" step="0.01">
+                <label for="filter_lfo_max">Filter LFO Max:</label>
+                <input type="number" id="filter_lfo_max" value="0.4" step="0.01">
+            </div>
+            <div class="range-input">
+                <label for="lfo_freq_min">LFO Freq Min:</label>
+                <input type="number" id="lfo_freq_min" value="1" step="0.1">
+                <label for="lfo_freq_max">LFO Freq Max:</label>
+                <input type="number" id="lfo_freq_max" value="20" step="0.1">
+            </div>
+            <div class="range-input">
+                <label for="filter_freq_min">Filter Freq Min:</label>
+                <input type="number" id="filter_freq_min" value="20" step="1">
+                <label for="filter_freq_max">Filter Freq Max:</label>
+                <input type="number" id="filter_freq_max" value="20000" step="1">
+            </div>
+            <div class="range-input">
+                <label for="amplitude_min">Amplitude Min:</label>
+                <input type="number" id="amplitude_min" value="0" step="0.01">
+                <label for="amplitude_max">Amplitude Max:</label>
+                <input type="number" id="amplitude_max" value="1" step="0.01">
+            </div>
         </div>
         <div id="debug">
             <h3>Debug Information:</h3>
@@ -77,18 +134,25 @@
         const xyCursor = document.getElementById('xy-cursor');
         const debugInfo = document.getElementById('debug_info');
 
-        const xMappings = {
-            oscillator_noise_amplitude: { min: 0.25, max: 0 },
-            oscillator_pulse_width: { min: -1, max: 1 },
-            oscillator_pitch_offset: { min: -48, max: 48 }
-        };
+        function getInputValue(id) {
+            return parseFloat(document.getElementById(id).value);
+        }
 
-        const yMappings = {
-            filter_lfo_amount: { min: 0, max: 0.4 },
-            lfo_frequency: { min: 20, max: 1 },
-            filter_frequency: { min: 20, max: 20000 },
-            amplitude: { min: 0, max: 1 }
-        };
+        function updateMappings() {
+            return {
+                xMappings: {
+                    oscillator_noise_amplitude: { min: getInputValue('noise_amp_min'), max: getInputValue('noise_amp_max') },
+                    oscillator_pulse_width: { min: getInputValue('pulse_width_min'), max: getInputValue('pulse_width_max') },
+                    oscillator_pitch_offset: { min: getInputValue('pitch_offset_min'), max: getInputValue('pitch_offset_max') }
+                },
+                yMappings: {
+                    filter_lfo_amount: { min: getInputValue('filter_lfo_min'), max: getInputValue('filter_lfo_max') },
+                    lfo_frequency: { min: getInputValue('lfo_freq_min'), max: getInputValue('lfo_freq_max') },
+                    filter_frequency: { min: getInputValue('filter_freq_min'), max: getInputValue('filter_freq_max') },
+                    amplitude: { min: getInputValue('amplitude_min'), max: getInputValue('amplitude_max') }
+                }
+            };
+        }
 
         function initAudio() {
             oscillator = audioContext.createOscillator();
@@ -123,6 +187,8 @@
         }
 
         function updateParameters(x, y) {
+            const { xMappings, yMappings } = updateMappings();
+
             const noiseAmplitude = mapValue(x, xMappings.oscillator_noise_amplitude.min, xMappings.oscillator_noise_amplitude.max);
             const pulseWidth = mapValue(x, xMappings.oscillator_pulse_width.min, xMappings.oscillator_pulse_width.max);
             const pitchOffset = mapValue(x, xMappings.oscillator_pitch_offset.min, xMappings.oscillator_pitch_offset.max);
@@ -205,6 +271,18 @@
             isDragging = false;
             xyPad.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg)';
             updateDebugInfo(0, 0, 0, 0, 0, 0, 0);
+        });
+
+        // Add event listeners to all input fields
+        document.querySelectorAll('.range-inputs input').forEach(input => {
+            input.addEventListener('change', () => {
+                if (isDragging) {
+                    const rect = xyPad.getBoundingClientRect();
+                    const x = parseFloat(xyCursor.style.left) / rect.width;
+                    const y = 1 - parseFloat(xyCursor.style.top) / rect.height;
+                    updateParameters(x, y);
+                }
+            });
         });
 
         // Initial parameter update

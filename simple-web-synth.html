@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Synthesizer with Accurate XY Mapping</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .synth {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        #xy-pad {
+            width: 300px;
+            height: 200px;
+            background-color: #e0e0e0;
+            position: relative;
+            cursor: crosshair;
+            perspective: 1000px;
+        }
+        #xy-cursor {
+            width: 10px;
+            height: 10px;
+            background-color: red;
+            border-radius: 50%;
+            position: absolute;
+            transform: translate(-50%, -50%);
+        }
+        .parameter-display {
+            margin-top: 20px;
+        }
+        #debug {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="synth">
+        <div id="xy-pad">
+            <div id="xy-cursor"></div>
+        </div>
+        <div class="parameter-display">
+            <div id="oscillator_pulse_width"></div>
+            <div id="filter_frequency"></div>
+            <div id="lfo_frequency"></div>
+            <div id="oscillator_pitch_offset"></div>
+            <div id="amplitude"></div>
+        </div>
+        <div id="debug">
+            <h3>Debug Information:</h3>
+            <pre id="debug_info"></pre>
+        </div>
+    </div>
+
+    <script>
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        let oscillator, gainNode, filterNode, lfoNode;
+        let isPlaying = false;
+        let isDragging = false;
+
+        const xyPad = document.getElementById('xy-pad');
+        const xyCursor = document.getElementById('xy-cursor');
+        const debugInfo = document.getElementById('debug_info');
+
+        const mappings = {
+            oscillator_pulse_width: { min: -1, max: 1 },
+            filter_frequency: { min: 20, max: 20000 },
+            lfo_frequency: { min: 0.1, max: 1000 },
+            oscillator_pitch_offset: { min: -48, max: 48 },
+            amplitude: { min: 0, max: 1 }
+        };
+
+        function initAudio() {
+            oscillator = audioContext.createOscillator();
+            gainNode = audioContext.createGain();
+            filterNode = audioContext.createBiquadFilter();
+            lfoNode = audioContext.createOscillator();
+            
+            oscillator.connect(filterNode);
+            filterNode.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            lfoNode.connect(oscillator.frequency);
+
+            oscillator.type = 'sawtooth';
+            filterNode.type = 'lowpass';
+            lfoNode.type = 'sine';
+
+            oscillator.start();
+            lfoNode.start();
+            isPlaying = true;
+        }
+
+        function stopAudio() {
+            if (isPlaying) {
+                oscillator.stop();
+                lfoNode.stop();
+                isPlaying = false;
+            }
+        }
+
+        function updateParameters(x, y) {
+            const pulseWidth = x * (mappings.oscillator_pulse_width.max - mappings.oscillator_pulse_width.min) + mappings.oscillator_pulse_width.min;
+            const filterFreq = y * (mappings.filter_frequency.max - mappings.filter_frequency.min) + mappings.filter_frequency.min;
+            const lfoFreq = y * (mappings.lfo_frequency.max - mappings.lfo_frequency.min) + mappings.lfo_frequency.min;
+            const pitchOffset = x * (mappings.oscillator_pitch_offset.max - mappings.oscillator_pitch_offset.min) + mappings.oscillator_pitch_offset.min;
+            const amp = y * (mappings.amplitude.max - mappings.amplitude.min) + mappings.amplitude.min;
+
+            if (isPlaying) {
+                // Oscillator pulse width (approximated with detune for sawtooth wave)
+                oscillator.detune.setValueAtTime(pulseWidth * 100, audioContext.currentTime);
+                
+                // Filter frequency
+                filterNode.frequency.setValueAtTime(filterFreq, audioContext.currentTime);
+                
+                // LFO frequency
+                lfoNode.frequency.setValueAtTime(lfoFreq, audioContext.currentTime);
+                
+                // Oscillator pitch offset
+                oscillator.detune.setValueAtTime(pitchOffset * 100, audioContext.currentTime);
+                
+                // Amplitude
+                gainNode.gain.setValueAtTime(amp, audioContext.currentTime);
+            }
+
+            // Update parameter display
+            document.getElementById('oscillator_pulse_width').textContent = `Pulse Width: ${pulseWidth.toFixed(2)}`;
+            document.getElementById('filter_frequency').textContent = `Filter Freq: ${filterFreq.toFixed(2)} Hz`;
+            document.getElementById('lfo_frequency').textContent = `LFO Freq: ${lfoFreq.toFixed(2)} Hz`;
+            document.getElementById('oscillator_pitch_offset').textContent = `Pitch Offset: ${pitchOffset.toFixed(2)} st`;
+            document.getElementById('amplitude').textContent = `Amplitude: ${amp.toFixed(2)}`;
+
+            updateDebugInfo(x, y, pulseWidth, filterFreq, lfoFreq, pitchOffset, amp);
+        }
+
+        function updateXYPad(e) {
+            const rect = xyPad.getBoundingClientRect();
+            let x = (e.clientX - rect.left) / rect.width;
+            let y = 1 - (e.clientY - rect.top) / rect.height;
+
+            x = Math.max(0, Math.min(1, x));
+            y = Math.max(0, Math.min(1, y));
+
+            xyCursor.style.left = `${x * rect.width}px`;
+            xyCursor.style.top = `${(1 - y) * rect.height}px`;
+
+            updateParameters(x, y);
+
+            // Calculate rotation based on mouse movement
+            const rotateX = (y - 0.5) * 30; // -15 to 15 degrees
+            const rotateY = (x - 0.5) * -30; // 15 to -15 degrees
+            xyPad.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+        }
+
+        function updateDebugInfo(x, y, pulseWidth, filterFreq, lfoFreq, pitchOffset, amp) {
+            debugInfo.textContent = JSON.stringify({
+                x: x.toFixed(2),
+                y: y.toFixed(2),
+                pulseWidth: pulseWidth.toFixed(2),
+                filterFreq: filterFreq.toFixed(2),
+                lfoFreq: lfoFreq.toFixed(2),
+                pitchOffset: pitchOffset.toFixed(2),
+                amplitude: amp.toFixed(2),
+                isPlaying
+            }, null, 2);
+        }
+
+        xyPad.addEventListener('mousedown', (e) => {
+            if (!isPlaying) initAudio();
+            isDragging = true;
+            updateXYPad(e);
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                updateXYPad(e);
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            stopAudio();
+            isDragging = false;
+            xyPad.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg)';
+            updateDebugInfo(0, 0, 0, 0, 0, 0, 0);
+        });
+
+        // Initial parameter update
+        updateParameters(0.5, 0.5);
+    </script>
+</body>
+</html>

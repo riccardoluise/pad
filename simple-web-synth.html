@@ -53,9 +53,11 @@
             <div id="xy-cursor"></div>
         </div>
         <div class="parameter-display">
+            <div id="oscillator_noise_amplitude"></div>
+            <div id="filter_lfo_amount"></div>
+            <div id="lfo_frequency"></div>
             <div id="oscillator_pulse_width"></div>
             <div id="filter_frequency"></div>
-            <div id="lfo_frequency"></div>
             <div id="oscillator_pitch_offset"></div>
             <div id="amplitude"></div>
         </div>
@@ -75,13 +77,16 @@
         const xyCursor = document.getElementById('xy-cursor');
         const debugInfo = document.getElementById('debug_info');
 
-        const mappings = {
+        const xMappings = {
             oscillator_noise_amplitude: { min: 0.25, max: 0 },
+            oscillator_pulse_width: { min: -1, max: 1 },
+            oscillator_pitch_offset: { min: -48, max: 48 }
+        };
+
+        const yMappings = {
             filter_lfo_amount: { min: 0, max: 0.4 },
             lfo_frequency: { min: 20, max: 1 },
-            oscillator_pulse_width: { min: -1, max: 1 },
             filter_frequency: { min: 20, max: 20000 },
-            oscillator_pitch_offset: { min: -48, max: 48 },
             amplitude: { min: 0, max: 1 }
         };
 
@@ -113,42 +118,36 @@
             }
         }
 
+        function mapValue(value, min, max) {
+            return value * (max - min) + min;
+        }
+
         function updateParameters(x, y) {
-            const noiseAmplitude = x * (mappings.oscillator_noise_amplitude.max - mappings.oscillator_noise_amplitude.min) + mappings.oscillator_noise_amplitude.min;
-            const filterLfoAmount = y * (mappings.filter_lfo_amount.max - mappings.filter_lfo_amount.min) + mappings.filter_lfo_amount.min;
-            const lfoFreq = y * (mappings.lfo_frequency.max - mappings.lfo_frequency.min) + mappings.lfo_frequency.min;
-            const pulseWidth = x * (mappings.oscillator_pulse_width.max - mappings.oscillator_pulse_width.min) + mappings.oscillator_pulse_width.min;
-            const filterFreq = y * (mappings.filter_frequency.max - mappings.filter_frequency.min) + mappings.filter_frequency.min;
-            const pitchOffset = x * (mappings.oscillator_pitch_offset.max - mappings.oscillator_pitch_offset.min) + mappings.oscillator_pitch_offset.min;
-            const amp = y * (mappings.amplitude.max - mappings.amplitude.min) + mappings.amplitude.min;
+            const noiseAmplitude = mapValue(x, xMappings.oscillator_noise_amplitude.min, xMappings.oscillator_noise_amplitude.max);
+            const pulseWidth = mapValue(x, xMappings.oscillator_pulse_width.min, xMappings.oscillator_pulse_width.max);
+            const pitchOffset = mapValue(x, xMappings.oscillator_pitch_offset.min, xMappings.oscillator_pitch_offset.max);
+
+            const filterLfoAmount = mapValue(y, yMappings.filter_lfo_amount.min, yMappings.filter_lfo_amount.max);
+            const lfoFreq = mapValue(y, yMappings.lfo_frequency.min, yMappings.lfo_frequency.max);
+            const filterFreq = mapValue(y, yMappings.filter_frequency.min, yMappings.filter_frequency.max);
+            const amp = mapValue(y, yMappings.amplitude.min, yMappings.amplitude.max);
 
             if (isPlaying) {
-                // Oscillator noise amplitude
                 gainNode.gain.setValueAtTime(noiseAmplitude, audioContext.currentTime);
-                
-                // Filter LFO amount
                 filterNode.frequency.setValueAtTime(filterLfoAmount, audioContext.currentTime);
-                
-                // LFO frequency
                 lfoNode.frequency.setValueAtTime(lfoFreq, audioContext.currentTime);
-                
-                // Oscillator pulse width (approximated with detune for sawtooth wave)
                 oscillator.detune.setValueAtTime(pulseWidth * 100, audioContext.currentTime);
-                
-                // Filter frequency
                 filterNode.frequency.setValueAtTime(filterFreq, audioContext.currentTime);
-                
-                // Oscillator pitch offset
                 oscillator.detune.setValueAtTime(pitchOffset * 100, audioContext.currentTime);
-                
-                // Amplitude
                 gainNode.gain.setValueAtTime(amp, audioContext.currentTime);
             }
 
             // Update parameter display
+            document.getElementById('oscillator_noise_amplitude').textContent = `Noise Amplitude: ${noiseAmplitude.toFixed(2)}`;
+            document.getElementById('filter_lfo_amount').textContent = `Filter LFO Amount: ${filterLfoAmount.toFixed(2)}`;
+            document.getElementById('lfo_frequency').textContent = `LFO Freq: ${lfoFreq.toFixed(2)} Hz`;
             document.getElementById('oscillator_pulse_width').textContent = `Pulse Width: ${pulseWidth.toFixed(2)}`;
             document.getElementById('filter_frequency').textContent = `Filter Freq: ${filterFreq.toFixed(2)} Hz`;
-            document.getElementById('lfo_frequency').textContent = `LFO Freq: ${lfoFreq.toFixed(2)} Hz`;
             document.getElementById('oscillator_pitch_offset').textContent = `Pitch Offset: ${pitchOffset.toFixed(2)} st`;
             document.getElementById('amplitude').textContent = `Amplitude: ${amp.toFixed(2)}`;
 
